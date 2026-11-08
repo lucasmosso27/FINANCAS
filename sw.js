@@ -1,5 +1,5 @@
 // Guarda o app no aparelho para abrir sem internet. A versão muda a cada build.
-const VERSAO = "cf-b8e93d233a";
+const VERSAO = "cf-6b72093d18";
 const ARQUIVOS = ["./", "index.html", "manifest.webmanifest", "local-store.js", "pwa.js",
   "icons/icon-192.png", "icons/icon-512.png", "icons/apple-touch-icon.png"];
 

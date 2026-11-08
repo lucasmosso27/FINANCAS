@@ -172,6 +172,19 @@ button:disabled { opacity: .55; cursor: default; }
 .fatura .v { font-family: var(--font-display); font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .fatura .partes { display: flex; gap: 14px; flex-wrap: wrap; font-size: 13px; color: var(--muted); margin-top: 4px; }
 .fatura .partes b { color: var(--ink); font-variant-numeric: tabular-nums; }
+[data-fat] { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.fatura[data-fat]:active, .cat[data-fat]:active, p[data-fat]:active { opacity: .75; }
+.fatura .ver { font-size: 13px; color: var(--accent); font-weight: 600; margin-top: 2px; }
+.seta { display: inline-block; transition: transform .2s; color: var(--accent); }
+[aria-expanded="true"] .seta { transform: rotate(90deg); }
+.fat-det { display: flex; flex-direction: column; padding: 0 0 4px; }
+.fd-cat { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; padding-top: 10px; font-weight: 600; font-size: 14px; }
+.fd-cat .ic { width: 28px; height: 28px; font-size: 14px; }
+.fd-cat .val { font-variant-numeric: tabular-nums; }
+.fd-it { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: baseline; padding: 6px 0 6px 38px; font-size: 14px; border-bottom: 1px solid var(--line); }
+.fd-it .d { min-width: 0; overflow-wrap: anywhere; }
+.fd-it .dt { font-size: 12px; color: var(--muted); }
+.fd-it .v { font-variant-numeric: tabular-nums; }
 .pill { display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); }
 .fixos { background: var(--accent-soft); border-radius: var(--r); padding: 12px 14px; display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; font-size: 14px; }
 
@@ -1115,19 +1128,39 @@ Frase: ${txt}`;
     const compras = parte(i => !i.virtual && !(i.parcelas > 1)), parcelas = parte(i => i.parcelas > 1), ass = parte(i => i.virtual);
     const prox = Array.from({ length: 5 }, (_, k) => addMonths(Fab, k + 1)).map(F => [F, tot(F)]);
     const max = Math.max(1, tot(Fab), ...prox.map(p => p[1]));
-    const linha = (F, v, cls) => `<div class="cat ${cls}"><span class="n">${mesAno(F)} <span class="hint">· vence ${venceEm(F)}</span></span><span class="val">${brl(v)}</span><div class="bar"><span style="width:${(v / max * 100).toFixed(1)}%"></span></div></div>`;
+    // Toque numa fatura abre as compras dela, agrupadas por categoria
+    const toca = F => `data-fat="${F}" role="button" tabindex="0" aria-expanded="${S.fatAberta === F}"`;
+    const det = F => S.fatAberta === F ? detalheFatura(its.filter(i => i.fatura === F)) : "";
+    const linha = F => { const v = tot(F); return `<div class="cat" ${toca(F)}><span class="n"><span class="seta">›</span> ${mesAno(F)}${F === Fhoje ? ` <span class="pill">aberta</span>` : ""} <span class="hint">· vence ${venceEm(F)}</span></span><span class="val">${brl(v)}</span><div class="bar"><span style="width:${(v / max * 100).toFixed(1)}%"></span></div></div>${det(F)}`; };
+    // A fatura aberta hoje já aparece nas próximas (com o selo "aberta"); a linha extra só serve quando não está lá
+    const naLista = F => prox.some(p => p[0] === F);
+    const extra = S.mes === ym(new Date()) && Fhoje !== Fab && !naLista(Fhoje) ? [Fhoje, `Aberta agora (${mesNome(Fhoje, { month: "long" })})`, `fecha ${fechaEm(Fhoje)}`]
+      : tot(Fant) ? [Fant, `Anterior (${mesNome(Fant, { month: "long" })})`, `venceu ${venceEm(Fant)}`] : null;
     $("cartao").innerHTML = `
-      <div class="fatura">
+      <div class="fatura" ${toca(Fab)}>
         <span class="k">Fatura ${estado} · ${mesNome(Fab, { month: "long" })}</span>
         <span class="v">${brl(tot(Fab))}</span>
         <span class="hint">${estado === "fechada" ? "Fechou" : "Fecha"} ${fechaEm(Fab)} · vence ${venceEm(Fab)}${estado === "prevista" ? " · só o previsto" : ""}</span>
         <div class="partes"><span>Compras <b>${brl(compras)}</b></span><span>Parcelas <b>${brl(parcelas)}</b></span><span>Assinaturas <b>${brl(ass)}</b></span></div>
+        ${ab.length ? `<span class="ver"><span class="seta">›</span> ${S.fatAberta === Fab ? "Esconder compras" : `Ver ${ab.length} ${ab.length === 1 ? "compra" : "compras"}`}</span>` : ""}
       </div>
-      ${S.mes === ym(new Date()) && Fhoje !== Fab ? `<p class="hint">Aberta agora (${mesNome(Fhoje, { month: "long" })}): <b style="color:var(--ink)">${brl(tot(Fhoje))}</b> · fecha ${fechaEm(Fhoje)}</p>`
-        : tot(Fant) ? `<p class="hint">Anterior (${mesNome(Fant, { month: "long" })}): <b style="color:var(--ink)">${brl(tot(Fant))}</b> · venceu ${venceEm(Fant)}</p>` : ""}
+      ${det(Fab)}
+      ${extra ? `<p class="hint" ${toca(extra[0])}><span class="seta">›</span> ${extra[1]}: <b style="color:var(--ink)">${brl(tot(extra[0]))}</b> · ${extra[2]}</p>${det(extra[0])}` : ""}
       <div class="lbl" style="font-size:14px">Próximas faturas (já previstas)</div>
-      <div class="cats">${prox.map(([F, v]) => linha(F, v, "")).join("")}</div>`;
+      <div class="cats">${prox.map(([F]) => linha(F)).join("")}</div>`;
   }
+  function detalheFatura(lst) {
+    if (!lst.length) return `<p class="empty">Nenhuma compra nesta fatura.</p>`;
+    const soma = xs => xs.reduce((a, i) => a + i.valor, 0), grupos = {};
+    for (const i of lst) (grupos[i.categoria] ||= []).push(i);
+    return `<div class="fat-det">${Object.entries(grupos).sort((a, b) => soma(b[1]) - soma(a[1])).map(([c, xs]) =>
+      `<div class="fd-cat">${icone(c)}<span>${esc(c)}</span><span class="val">${brl(soma(xs))}</span></div>` +
+      xs.sort((a, b) => b.data.localeCompare(a.data)).map(i => `<div class="fd-it"><span class="d">${esc(i.descricao)}${i.parcelas > 1 ? ` <span class="pill">${i.parcela}/${i.parcelas}</span>` : ""}${i.virtual ? ` <span class="pill">assinatura</span>` : ""}</span><span class="dt">${i.data.slice(8)}/${i.data.slice(5, 7)}</span><span class="v">${brl(i.valor)}</span></div>`).join("")
+    ).join("")}</div>`;
+  }
+  const abrirFatura = el => { S.fatAberta = S.fatAberta === el.dataset.fat ? null : el.dataset.fat; renderCartao(); };
+  $("cartao").addEventListener("click", e => { const el = e.target.closest("[data-fat]"); if (el) abrirFatura(el); });
+  $("cartao").addEventListener("keydown", e => { const el = e.target.closest("[data-fat]"); if (el && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); abrirFatura(el); } });
 
   // Compromissos a partir do mês que vem (sempre em relação a hoje)
   function renderParcelas() {
